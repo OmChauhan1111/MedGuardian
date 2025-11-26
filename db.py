@@ -6,10 +6,10 @@ from typing import List, Dict, Any
 
 # ---------- Update these if your XAMPP MySQL has password / different user ----------
 DB_CONFIG = {
-    "host": "sql313.infinityfree.com",
+    "host": "mysql.railway.internal",
     "user": "if0_40528967",
-    "password": "wlXeL06y1w",        # <-- put your MySQL password if any
-    "database": "if0_40528967_medguardian",
+    "password": "UeMKvnmeiOcfVGUlGYwFTobSSbRYEFrZ",  
+    "database": "medguardian",
     "raise_on_warnings": True,
     "autocommit": False
 }
