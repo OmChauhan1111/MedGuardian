@@ -6,9 +6,9 @@ from typing import List, Dict, Any
 
 # ---------- Update these if your XAMPP MySQL has password / different user ----------
 DB_CONFIG = {
-    "host": "mysql.railway.internal",
-    "user": "if0_40528967",
-    "password": "UeMKvnmeiOcfVGUlGYwFTobSSbRYEFrZ",  
+    "host": "medguardian.cvg6ukmcac8i.eu-north-1.rds.amazonaws.com",
+    "user": "admin",
+    "password": "Omchauhanom1111",  
     "database": "medguardian",
     "raise_on_warnings": True,
     "autocommit": False
