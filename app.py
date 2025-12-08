@@ -72,13 +72,53 @@ if os.path.exists("welcome.json"):
     except Exception:
         welcome_anim = None
 
-# -------------------- Load Models --------------------
+# -------------------- Load Models (FIXED) --------------------
 @st.cache_resource
 def load_models():
-    diabetes = pickle.load(open("Diabetes/diabetes_model.pkl","rb")) if os.path.exists("Diabetes/Diabetes_model.pkl") else None
-    heart = pickle.load(open("Heart/heart_model.pkl","rb")) if os.path.exists("Heart/heart_model.pkl") else None
-    kidney = pickle.load(open("Kidney/kidney_model.pkl","rb")) if os.path.exists("Kidney/kidney_model.pkl") else None
-    return diabetes,heart,kidney
+    """
+    Load diabetes, heart and kidney models using absolute paths.
+    This fixes case-sensitivity and relative-path issues on Linux servers.
+    """
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+    diabetes_path = os.path.join(BASE_DIR, "Diabetes", "diabetes_model.pkl")
+    heart_path    = os.path.join(BASE_DIR, "Heart",    "heart_model.pkl")
+    kidney_path   = os.path.join(BASE_DIR, "Kidney",   "kidney_model.pkl")
+
+    diabetes = heart = kidney = None
+
+    # Diabetes model
+    if os.path.exists(diabetes_path):
+        try:
+            with open(diabetes_path, "rb") as f:
+                diabetes = pickle.load(f)
+        except Exception as e:
+            st.error(f"❌ Failed to load Diabetes model: {e}")
+    else:
+        st.error(f"❌ Diabetes model file not found: {diabetes_path}")
+
+    # Heart model
+    if os.path.exists(heart_path):
+        try:
+            with open(heart_path, "rb") as f:
+                heart = pickle.load(f)
+        except Exception as e:
+            st.error(f"❌ Failed to load Heart model: {e}")
+    else:
+        st.error(f"❌ Heart model file not found: {heart_path}")
+
+    # Kidney model
+    if os.path.exists(kidney_path):
+        try:
+            with open(kidney_path, "rb") as f:
+                kidney = pickle.load(f)
+        except Exception as e:
+            st.error(f"❌ Failed to load Kidney model: {e}")
+    else:
+        st.error(f"❌ Kidney model file not found: {kidney_path}")
+
+    return diabetes, heart, kidney
+
 
 diabetes_model, heart_model, kidney_model = load_models()
 
@@ -113,7 +153,6 @@ st.markdown("""
 # -------------------- AUTH (Full-page card) --------------------
 def show_auth_page():
     """Full-width professional login/register card. Blocks access until login/register."""
-    # Use the same splash logo image (logo_splash.png) to ensure consistent visual
     logo_img = "logo_splash.png" if os.path.exists("logo_splash.png") else "logo.png"
 
     st.markdown(f"""
@@ -181,10 +220,17 @@ check_auto_logout()
 
 # -------------------- MAIN LAYOUT --- Sidebar with navigation (after auth) --------------------
 with st.sidebar:
-    # after login use standard logo (fallback to splash if needed)
     sidebar_logo = "logo.png" if os.path.exists("logo.png") else ("logo_splash.png" if os.path.exists("logo_splash.png") else None)
     if sidebar_logo:
         st.image(sidebar_logo, width=170)
+
+    # Model status debug (helps to see if models loaded on server)
+    st.write("🧠 Model status:", {
+        "Diabetes": diabetes_model is not None,
+        "Heart": heart_model is not None,
+        "Kidney": kidney_model is not None
+    })
+
     st.markdown("### 🔐 Account")
     st.markdown(f"**Signed in as:** {st.session_state.user['username']}")
     if st.button("Logout"):
@@ -208,7 +254,6 @@ if page == "🏠 Dashboard":
     for r in reports_db:
         raw = r.get("raw") or {}
         if raw:
-            # attach a DB id if present for deletion
             raw['__db_id'] = r.get('id')
             reports.append(raw)
         else:
@@ -283,12 +328,9 @@ if page == "🏠 Dashboard":
                             st.error("PDF generation error: "+str(e))
                     with cols[1]:
                         st.download_button("💾 Export (CSV)", pd.DataFrame([r]).to_csv(index=False).encode('utf-8'), file_name=f"{name}_{condition}_report.csv", key=f"csv_{i}_{int(time.time())}")
-                                       # === Replace the previous cols[2] delete logic with this stable implementation ===
                     with cols[2]:
-                        # create a stable key based on dbid (or index if dbid None)
                         stable_key = f"del_btn_{dbid if dbid is not None else 'local'}_{i}"
                         if st.button("🗑️ Delete Record", key=stable_key):
-                            # store candidate info in session (stable across reruns)
                             st.session_state['delete_candidate'] = {
                                 'db_id': dbid,
                                 'pid': pid,
@@ -296,24 +338,16 @@ if page == "🏠 Dashboard":
                                 'date': r.get('Date'),
                                 'index': i
                             }
-                            # do NOT safe_rerun immediately — allow confirmation UI to render
 
-                    # Confirmation UI (renders if candidate matches current record)
                     cand = st.session_state.get('delete_candidate')
                     if cand and cand.get('pid') == pid and cand.get('condition') == condition and cand.get('date') == r.get('Date'):
                         st.warning("You are about to delete this record. This action cannot be undone.")
                         c1, c2 = st.columns([1,1])
-                        # Confirm button with stable key
                         if c1.button("Confirm Delete", key=f"confirm_del_{dbid if dbid is not None else 'local'}_{i}"):
-                            # Debug info
-                            st.write("DEBUG: delete_candidate:", cand)
-                            st.write("DEBUG: total session reports (count):", len(st.session_state.get('reports', [])))
-                            # Try DB delete first (if db helper exists and db_id present)
                             removed_db = False
                             if cand.get('db_id') and db_delete_report is not None:
                                 try:
                                     ok = db_delete_report(cand.get('db_id'))
-                                    st.write("DEBUG: db_delete_report returned:", ok)
                                     if ok:
                                         st.success("✔️ Database record deleted successfully.")
                                         removed_db = True
@@ -321,11 +355,9 @@ if page == "🏠 Dashboard":
                                         st.warning("⚠️ Database reported 0 rows affected (no deletion).")
                                 except Exception as e:
                                     st.error(f"❌ DB delete failed: {e}")
-                                    print("DB delete exception:", e)
                             else:
                                 st.info("No DB delete helper available or record is unsaved (local-only).")
 
-                            # Remove from local session view (always attempt)
                             try:
                                 before = len(st.session_state.get('reports', []))
                                 st.session_state.reports = [
@@ -333,16 +365,13 @@ if page == "🏠 Dashboard":
                                     if not (rr.get('Patient ID') == cand.get('pid') and rr.get('Condition') == cand.get('condition') and rr.get('Date') == cand.get('date'))
                                 ]
                                 after = len(st.session_state.get('reports', []))
-                                st.write(f"DEBUG: removed local? before={before} after={after}")
                                 if after < before:
                                     st.success("✔️ Report removed from local session view.")
                                 else:
                                     st.warning("⚠️ Report not found in local session list to remove.")
                             except Exception as e:
                                 st.error(f"Failed to remove local record: {e}")
-                                print("Local delete exception:", e)
 
-                            # Clean up and rerun to refresh UI
                             st.session_state.pop('delete_candidate', None)
                             update_last_active()
                             safe_rerun()
@@ -350,7 +379,6 @@ if page == "🏠 Dashboard":
                         if c2.button("Cancel", key=f"cancel_del_{dbid if dbid is not None else 'local'}_{i}"):
                             st.session_state.pop('delete_candidate', None)
                             safe_rerun()
-
 
                     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -360,7 +388,8 @@ if page == "🏠 Dashboard":
             if 'Patient Name' not in df.columns:
                 df['Patient Name'] = df.get('Patient Name', pd.Series(["Unknown"]*len(df)))
             df['Risk %'] = pd.to_numeric(df['Risk %'], errors='coerce').fillna(0)
-            fig = px.bar(df, x='Patient Name', y='Risk %', color='Condition', text='Risk %', template='plotly_white', color_discrete_map={"Heart":"#ff4b4b","Diabetes":"#ffb84d","Kidney":"#7cd992"})
+            fig = px.bar(df, x='Patient Name', y='Risk %', color='Condition', text='Risk %', template='plotly_white',
+                         color_discrete_map={"Heart":"#ff4b4b","Diabetes":"#ffb84d","Kidney":"#7cd992"})
             fig.update_traces(textposition="outside", marker_line_width=0.8, marker_line_color='rgba(0,0,0,0.12)')
             fig.update_layout(yaxis_title="Risk %", xaxis_title="Patient", margin=dict(t=40,b=30), bargap=0.25)
             st.plotly_chart(fig, use_container_width=True)
@@ -492,7 +521,6 @@ elif page=="🩺 Health Scan":
             existing_keys = {(r.get("Patient ID"), r.get("Condition"), r.get("Date")) for r in st.session_state.reports if r.get("Patient ID")}
             if key_tuple not in existing_keys:
                 st.session_state.reports.append(report)
-            # save to DB if logged in
             if st.session_state.get("user"):
                 try:
                     insert_report(st.session_state.user['id'], report)
@@ -508,7 +536,7 @@ elif page=="🩺 Health Scan":
 
     # ---------- DIABETES ----------
     if disease=="Diabetes":
-        st.subheader("🧁Diabetes Disease Input Panel")
+        st.subheader("🧁 Diabetes Disease Input Panel")
         st.info("⚠️ If you don't know any value, leave it as default (Normal)")
         gender = st.radio("Gender",["Male","Female"])
         gender_val = 1 if gender=="Male" else 0
@@ -670,17 +698,15 @@ elif page=="🩺 Health Scan":
 # -------------------- DOCTOR CHATBOT (improved + debug) --------------------
 elif page == "🤖 Doctor Chatbot":
     update_last_active()
-    st.set_page_config(page_title="MedGuardian Doctor AI", layout="wide")
+    # (second set_page_config not really needed, but harmless if left)
     st.markdown("<h2 style='text-align:center;'>🩺 MedGuardian — AI Doctor Chatbot</h2>", unsafe_allow_html=True)
 
-    # Gemini Toggle
     use_gemini = st.checkbox(
         "Use Gemini (cloud LLM) for detailed answers (may require API key)",
         value=True
     )
     st.caption("Tip: Turn off Gemini to use only fast local rule-based replies.")
 
-    # Check API Key
     api_present = True
     try:
         key = st.secrets.get("GEMINI_API_KEY") if hasattr(st, "secrets") else None
@@ -692,7 +718,6 @@ elif page == "🤖 Doctor Chatbot":
     except Exception:
         api_present = False
 
-    # Load history (first time)
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
         if st.session_state.get("user"):
@@ -704,7 +729,6 @@ elif page == "🤖 Doctor Chatbot":
             except Exception:
                 pass
 
-    # Show chat
     chat_container = st.container()
     with chat_container:
         for sender, message in st.session_state.chat_history:
@@ -721,7 +745,6 @@ elif page == "🤖 Doctor Chatbot":
 
     st.write("---")
 
-    # Form Input
     with st.form(key="chat_form", clear_on_submit=True):
         cols = st.columns([5, 1])
         with cols[0]:
@@ -736,7 +759,6 @@ elif page == "🤖 Doctor Chatbot":
         if send and user_input.strip() != "":
             update_last_active()
 
-            # Add user msg
             st.session_state.chat_history.append(("You", user_input))
             if st.session_state.get("user"):
                 try:
@@ -744,14 +766,12 @@ elif page == "🤖 Doctor Chatbot":
                 except Exception:
                     pass
 
-            # Thinking bubble
             th = st.empty()
             th.markdown(
                 "<div style='background:#FFF8DC;padding:12px;border-radius:12px;margin:8px;'>"
                 "<b>🤖 Doctor AI:</b> <i>Thinking...</i></div>",
                 unsafe_allow_html=True)
 
-            # Select reply
             if use_gemini and not api_present:
                 reply = "Gemini key missing — enable GEMINI_API_KEY to get full responses."
             else:
@@ -771,7 +791,6 @@ elif page == "🤖 Doctor Chatbot":
 
             th.empty()
 
-            # Add reply
             st.session_state.chat_history.append(("Doctor", reply))
             if st.session_state.get("user"):
                 try:
@@ -781,7 +800,6 @@ elif page == "🤖 Doctor Chatbot":
 
             safe_rerun()
 
-    # Clear Chat
     if st.button("🧹 Clear Chat History"):
         st.session_state.chat_history = []
         safe_rerun()
