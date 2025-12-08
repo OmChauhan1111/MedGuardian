@@ -9,6 +9,9 @@ from chatbot import doctor_chatbot
 from datetime import datetime
 import time
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
 # DB helpers (MySQL)
 from db import create_user, authenticate_user, insert_report, get_reports_for_user, insert_chat, get_chats_for_user
 # Optional DB delete helper — if not implemented in your db module the code falls back to session-state removal
@@ -21,7 +24,7 @@ except Exception:
 st.set_page_config(page_title="MedGuardian", page_icon="🧬", layout="wide")
 
 # ---------- Settings ----------
-TIMEOUT_MINUTES = 15  # auto-logout after this many minutes of inactivity
+TIMEOUT_MINUTES = 180  # auto-logout after this many minutes of inactivity
 
 # ---------- Helpers ----------
 def safe_rerun():
@@ -152,19 +155,34 @@ st.markdown("""
 
 # -------------------- AUTH (Full-page card) --------------------
 def show_auth_page():
-    """Full-width professional login/register card. Blocks access until login/register."""
-    logo_img = "logo_splash.png" if os.path.exists("logo_splash.png") else "logo.png"
+    logo_splash_path = os.path.join(BASE_DIR, "logo_splash.png")
+    logo_path = os.path.join(BASE_DIR, "logo.png")
+
+    if os.path.exists(logo_splash_path):
+        logo_img = logo_splash_path
+    elif os.path.exists(logo_path):
+        logo_img = logo_path
+    else:
+        logo_img = None
 
     st.markdown(f"""
     <div class='center auth-card card'>
         <div style='display:flex; gap:20px; align-items:center; width:100%'>
             <div style='flex:1'>
-                <img src='{logo_img}' width='180' />
-                <h2 style='margin-top:8px'>MedGuardian — Sign in to continue</h2>
-                <p class='small-muted'>Secure access to your AI health reports and chat. Your data stays private.</p>
+    """, unsafe_allow_html=True)
+
+    if logo_img:
+        st.image(logo_img, width=180)
+    else:
+        st.write("MedGuardian")
+
+    st.markdown("""
+            <h2 style='margin-top:8px'>MedGuardian — Sign in to continue</h2>
+            <p class='small-muted'>Secure access to your AI health reports and chat. Your data stays private.</p>
             </div>
             <div style='flex:1.2'>
     """, unsafe_allow_html=True)
+
 
     auth_tab = st.radio("", ["Login","Register"], index=0, horizontal=True)
 
@@ -220,9 +238,14 @@ check_auto_logout()
 
 # -------------------- MAIN LAYOUT --- Sidebar with navigation (after auth) --------------------
 with st.sidebar:
-    sidebar_logo = "logo.png" if os.path.exists("logo.png") else ("logo_splash.png" if os.path.exists("logo_splash.png") else None)
-    if sidebar_logo:
-        st.image(sidebar_logo, width=170)
+    sidebar_logo_path = os.path.join(BASE_DIR, "logo.png")
+    sidebar_splash_path = os.path.join(BASE_DIR, "logo_splash.png")
+
+    if os.path.exists(sidebar_logo_path):
+        st.image(sidebar_logo_path, width=170)
+    elif os.path.exists(sidebar_splash_path):
+        st.image(sidebar_splash_path, width=170)
+
 
     # Model status debug (helps to see if models loaded on server)
     st.write("🧠 Model status:", {
