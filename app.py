@@ -75,7 +75,7 @@ if os.path.exists("welcome.json"):
 # -------------------- Load Models --------------------
 @st.cache_resource
 def load_models():
-    diabetes = pickle.load(open("Diabetes/Diabetes_model.pkl","rb")) if os.path.exists("Diabetes/Diabetes_model.pkl") else None
+    diabetes = pickle.load(open("Diabetes/diabetes_model.pkl","rb")) if os.path.exists("Diabetes/Diabetes_model.pkl") else None
     heart = pickle.load(open("Heart/heart_model.pkl","rb")) if os.path.exists("Heart/heart_model.pkl") else None
     kidney = pickle.load(open("Kidney/kidney_model.pkl","rb")) if os.path.exists("Kidney/kidney_model.pkl") else None
     return diabetes,heart,kidney
